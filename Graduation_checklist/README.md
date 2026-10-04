@@ -85,7 +85,7 @@
 فایل اصلی پروژه را در یک پوشه قرار دهید:
 
 ```text
-Checklist v.1.00.py
+Checklist.py
 ```
 
 ### 2. اجرای برنامه
@@ -93,13 +93,13 @@ Checklist v.1.00.py
 در Windows می‌توانید در پوشه پروژه Command Prompt یا PowerShell را باز کرده و اجرا کنید:
 
 ```bash
-python "Checklist  v.1.00.py"
+python "Checklist.py"
 ```
 
 یا در صورت استفاده از Python Launcher:
 
 ```bash
-py "Checklist  v.1.00.py"
+py "Checklist.py"
 ```
 
 ### 3. ایجاد پایگاه داده

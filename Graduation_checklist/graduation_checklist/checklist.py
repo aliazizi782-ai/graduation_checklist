@@ -1,9 +1,11 @@
 import os
+import sys
 import shutil
 import sqlite3
 import tkinter as tk
 from tkinter import ttk, messagebox, filedialog
 import tkinter.font as tkfont
+from PIL import Image, ImageTk
 from dataclasses import dataclass
 from typing import List
 from datetime import datetime
@@ -11,6 +13,43 @@ from datetime import datetime
 DB_NAME = "graduation_checklist.db"
 APP_TITLE = "سامانه چک‌لیست فارغ‌التحصیلی -کارشناسی پیوسته مهندسی کامپیوتر"
 APP_VERSION = "1.0.0"
+def get_resource_path(relative_path):
+    """
+    دریافت مسیر مطلق یک فایل منابع (مثل آیکون)
+   
+    """
+    try:
+        base_path = sys._MEIPASS
+    except AttributeError:
+        base_path = os.path.abspath(os.path.dirname(__file__))
+    return os.path.join(base_path, relative_path)
+
+
+def set_window_icon(window, icon_name="icon.JPG"):
+  
+    icon_path = get_resource_path(icon_name)
+    if not os.path.exists(icon_path):
+        return
+
+    try:
+        img = Image.open(icon_path)
+
+        # چند اندازه‌ی رایج می‌سازیم تا ویندوز بهترین را انتخاب کند
+        sizes = [(16, 16), (32, 32), (48, 48), (64, 64), (128, 128), (256, 256)]
+        photos = []
+        for size in sizes:
+            resized = img.resize(size, Image.LANCZOS)
+            photos.append(ImageTk.PhotoImage(resized))
+
+        # اعمال روی پنجره (True یعنی روی همه‌ی پنجره‌های بعدی هم اعمال شود)
+        window.iconphoto(True, *photos)
+
+
+        window._icon_photos = photos
+
+    except Exception as e:
+        # اگر خطایی رخ داد، فقط چاپ کن (برای دیباگ)
+        print(f"خطا در تنظیم آیکون: {e}")
 
 # ======================================================================
 # قوانین چارت 1403
@@ -1039,6 +1078,7 @@ class GraduationApp(tk.Tk):
     def __init__(self):
         super().__init__()
         self.title(APP_TITLE)
+        set_window_icon(self)   #  آیکون پنجره‌ی اصلی
         self.setup_auto_geometry(self, width_ratio=0.92, height_ratio=0.85,
                                  min_width=1100, min_height=650, center=True)
         self.minsize(1000, 600)
@@ -1073,7 +1113,73 @@ class GraduationApp(tk.Tk):
             win.geometry(f"{width}x{height}+{x}+{y}")
         else:
             win.geometry(f"{width}x{height}")
+    # ------------------------------------------------------------------
+    
+    def show_toast(self, message, kind="success", duration=2500):
+       
+        colors = {
+            "success": {"bg": "#16a34a", "border": "#15803d", "icon": "✓"},
+            "info":    {"bg": "#2563eb", "border": "#1d4ed8", "icon": "ℹ"},
+            "warning": {"bg": "#d97706", "border": "#b45309", "icon": "⚠"},
+            "error":   {"bg": "#dc2626", "border": "#b91c1c", "icon": "✗"},
+        }
+        theme = colors.get(kind, colors["success"])
 
+        # اگر toast قبلی وجود دارد، حذفش کن
+        if hasattr(self, "_active_toast") and self._active_toast is not None:
+            try:
+                self._active_toast.destroy()
+            except tk.TclError:
+                pass
+            self._active_toast = None
+
+        # فریم اصلی toast
+        toast = tk.Frame(
+            self,
+            bg=theme["bg"],
+            highlightbackground=theme["border"],
+            highlightthickness=1,
+            bd=0,
+        )
+        inner = tk.Frame(toast, bg=theme["bg"])
+        inner.pack(padx=16, pady=10)
+
+        icon_label = tk.Label(
+            inner, text=theme["icon"], bg=theme["bg"], fg="white",
+            font=(self.font_family, 14, "bold"),
+        )
+        icon_label.pack(side="right", padx=(0, 8))
+
+        msg_label = tk.Label(
+            inner, text=message, bg=theme["bg"], fg="white",
+            font=(self.font_family, 12, "bold"),
+            justify="right",
+        )
+        msg_label.pack(side="right")
+
+        # قرار دادن toast در بالای پنجره، وسط‌چین
+        toast.place(relx=0.5, rely=0.04, anchor="n")
+        self._active_toast = toast
+
+        # انیمیشن fade out
+        def fade_out(step=10):
+            if step <= 0:
+                try:
+                    toast.destroy()
+                except tk.TclError:
+                    pass
+                if getattr(self, "_active_toast", None) is toast:
+                    self._active_toast = None
+                return
+            try:
+                current_rely = 0.04 + (10 - step) * 0.002
+                toast.place_configure(rely=current_rely)
+            except tk.TclError:
+                return
+            self.after(30, lambda: fade_out(step - 1))
+
+        self.after(duration, fade_out)
+    
     # ------------------------------------------------------------------
     def setup_style(self):
         style = ttk.Style(self)
@@ -1317,6 +1423,7 @@ class GraduationApp(tk.Tk):
         """ صفحه ی خوش آمدگویی  """
         win = tk.Toplevel(self)
         win.title("خوش آمدید")
+        set_window_icon(win)
         self.setup_auto_geometry(win, width_ratio=0.50, height_ratio=0.87,
                                 min_width=600, min_height=580, center=True)
         win.resizable(False, False)
@@ -1348,7 +1455,7 @@ class GraduationApp(tk.Tk):
         info_card.pack(fill="x", padx=24, pady=4)
 
         info = (
-            "📌 مبنای برنامه: چارت 1403/4/10 وزارت علوم\n"
+            "📌 مبنای برنامه: چارت 1403/4/10 وزارت علوم، تحقیقات و فناوری\n"
             "🎯 مجموع واحدهای لازم: 146 واحد پایه + واحدهای جبرانی\n\n"
             "📚 :دسته‌بندی دروس\n"
             " تخصصی الزامی: 59 واحد• \n"
@@ -1403,22 +1510,19 @@ class GraduationApp(tk.Tk):
 
     # ------------------------------------------------------------------
     def save_student(self):
-        name = self.name_var.get().strip()
-        no = self.no_var.get().strip()
-        year = self.year_var.get().strip()
+        name = self.name_var    .get().strip()
+        no = self.no_var        .get().strip()
+        year = self.year_var    .get().strip()
 
         if not name or len(name) < 3:
-            messagebox.showwarning("نامعتبر",
-                                   ".نام باید حداقل 3 کاراکتر باشد")
+            self.show_toast("نام باید حداقل ۳ کاراکتر باشد", kind="warning")
             return
         if not no or not no.isdigit() or len(no) < 5:
-            messagebox.showwarning("نامعتبر",
-                                   "شماره دانشجویی باید عددی و حداقل "
-                                   "5 .رقم باشد")
+            self.show_toast("شماره دانشجویی باید عددی و حداقل ۵ رقم باشد",
+                            kind="warning")
             return
         if year and (not year.isdigit() or len(year) != 4):
-            messagebox.showwarning("نامعتبر",
-                                   ".سال ورود باید 4 رقمی باشد")
+            self.show_toast("سال ورود باید ۴ رقمی باشد", kind="warning")
             return
 
         try:
@@ -1426,8 +1530,7 @@ class GraduationApp(tk.Tk):
             if gpa < 0 or gpa > 20:
                 raise ValueError
         except ValueError:
-            messagebox.showwarning("نامعتبر",
-                                   ".معدل باید عددی بین 0 و 20 باشد")
+            self.show_toast("معدل باید عددی بین ۰ و ۲۰ باشد", kind="warning")
             return
 
         try:
@@ -1437,13 +1540,18 @@ class GraduationApp(tk.Tk):
                 raise ValueError
             comp_units = int(comp_float)
         except ValueError:
-            messagebox.showwarning("نامعتبر",
-                                   ".واحد جبرانی باید یکی از مقادیر ۰، ۲، ۴، ۶ یا ۸ باشد")
+            self.show_toast("واحد جبرانی باید یکی از مقادیر ۰، ۲، ۴، ۶ یا ۸ باشد",
+                            kind="warning")
             return
 
         conn = get_conn()
         cur = conn.cursor()
         try:
+                
+            cur.execute("SELECT id FROM students WHERE student_no=?", (no,))
+            existing = cur.fetchone()
+            is_new = existing is None
+
             cur.execute("""
                 INSERT INTO students(student_no, name, entry_year,
                     current_gpa, is_last_semester, is_summer,
@@ -1458,22 +1566,35 @@ class GraduationApp(tk.Tk):
                     needs_compensatory=excluded.needs_compensatory,
                     compensatory_units=excluded.compensatory_units
             """, (no, name, year, gpa,
-                  int(self.is_last_var.get()),
-                  int(self.is_summer_var.get()),
-                  int(comp_units > 0), comp_units))
+                int(self.is_last_var.get()),
+                int(self.is_summer_var.get()),
+                int(comp_units > 0), comp_units))
             conn.commit()
 
             cur.execute("SELECT id FROM students WHERE student_no=?", (no,))
             self.student_id = cur.fetchone()[0]
             self.status_var.set(f"دانشجو: {name} - {no}")
             self.update_progress()
+
+            
+            if is_new:
+                self.show_toast(
+                    f"دانشجوی «{name}» با موفقیت ثبت شد",
+                    kind="success"
+                )
+            else:
+                self.show_toast(
+                    f"اطلاعات دانشجوی «{name}» به‌روزرسانی شد",
+                    kind="success"
+                )
+
         except sqlite3.Error as e:
-            messagebox.showerror("خطای پایگاه داده", str(e))
+            self.show_toast(f"خطای پایگاه داده: {e}", kind="error")
+            return
         finally:
             conn.close()
 
         self.load_courses()
-
     
     def choose_student(self):
         conn = get_conn()
@@ -1489,6 +1610,7 @@ class GraduationApp(tk.Tk):
 
         win = tk.Toplevel(self)
         win.title("انتخاب دانشجو")
+        set_window_icon(win)
         self.setup_auto_geometry(win, width_ratio=0.55, height_ratio=0.60,
                                 min_width=600, min_height=400, center=True)
         win.transient(self)
@@ -1511,7 +1633,7 @@ class GraduationApp(tk.Tk):
             tree.heading(c, text=h)
             tree.column(c, width=w, anchor="center")
 
-        # ✅ نگاشت شماره ردیف به شناسه واقعی دیتابیس
+        
         row_to_db_id = {}
 
         def refresh_list(*args):
@@ -1540,7 +1662,7 @@ class GraduationApp(tk.Tk):
                 return
             values = tree.item(item[0], "values")
             display_index = int(values[3])
-            # ✅ پیدا کردن شناسه واقعی از روی شماره ردیف
+            
             sid = row_to_db_id.get(display_index)
             if sid is None:
                 return
@@ -1737,6 +1859,7 @@ class GraduationApp(tk.Tk):
 
         win = tk.Toplevel(self)
         win.title(f"ثبت نمره - {name}")
+        set_window_icon(win)
         self.setup_auto_geometry(win, width_ratio=0.40, height_ratio=0.58,
                                  min_width=500, min_height=380, center=True)
         win.resizable(False, False)
@@ -1871,6 +1994,7 @@ class GraduationApp(tk.Tk):
 
         win = tk.Toplevel(self)
         win.title("بررسی وضعیت فارغ‌التحصیلی")
+        set_window_icon(win)
         self.setup_auto_geometry(win, width_ratio=0.80, height_ratio=0.88,
                                 min_width=850, min_height=620, center=True)
         win.transient(self)
